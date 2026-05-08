@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environnement virtuel
+myworld/
+venv/
+env/
+
+# Base de données
+db.sqlite3
+
+# VS Code
+.vscode/
+
+# Media (fichiers uploadés par les utilisateurs si tu en as)
+media/
