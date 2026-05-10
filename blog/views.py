@@ -265,22 +265,22 @@ class ArticleDeleteView(DeleteView):
 
     def liste_articles(request):
 
-    tri = request.GET.get('tri')
+        tri = request.GET.get('tri')
 
-    articles = Article.objects.all()
+        articles = Article.objects.all()
 
-    if tri == 'date':
-        articles = articles.order_by('-date_creation')
+        if tri == 'date':
+            articles = articles.order_by('-date_creation')
 
-    elif tri == 'titre':
-        articles = articles.order_by('titre')
+        elif tri == 'titre':
+            articles = articles.order_by('titre')
 
-    elif tri == 'popularite':
-        articles = articles.order_by('-vues')
+        elif tri == 'popularite':
+            articles = articles.order_by('-vues')
 
-    return render(request, 'blog/liste.html', {
-        'articles': articles
-    })
+        return render(request, 'blog/liste.html', {
+            'articles': articles
+        })
 
 
 

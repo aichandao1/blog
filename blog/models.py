@@ -4,6 +4,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
+import math
 
 
 class Auteur(models.Model):
@@ -23,7 +24,7 @@ class Auteur(models.Model):
         help_text='Presentation de l auteur',
     )
     photo = models.ImageField(
-        upload_to='auteurs/',         # Stocke dans media/auteurs/
+        upload_to='auteurs/',         
         blank=True,
         null=True,
         verbose_name='Photo de profil',
@@ -142,6 +143,18 @@ class Article(models.Model):
     date_modification = models.DateTimeField(auto_now=True)
     date_publication = models.DateTimeField(null=True, blank=True)
     nb_vues = models.PositiveIntegerField(default=0, verbose_name='Nombre de vues')
+    temps_lecture = models.PositiveIntegerField(
+        default=0,
+        editable=False
+    )
+    def save(self, *args, **kwargs):
+        mots = self.contenu.split()
+        nb_mots = len(mots)
+        self.temps_lecture = math.ceil(nb_mots / 200)
+        
+        super().save(*args,**kwargs)
+
+
 
     class Meta:
         verbose_name = 'Article'
