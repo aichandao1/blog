@@ -1,0 +1,21 @@
+{% extends 'blog/base.html' %}
+
+{% block contenu %}
+
+<h2>Résultats pour "{{ query }}"</h2>
+
+<h3>Articles</h3>
+{% for article in articles %}
+    <p>{{ article.titre }}</p>
+{% empty %}
+    <p>Aucun article trouvé</p>
+{% endfor %}
+
+<h3>Auteurs</h3>
+{% for auteur in auteurs %}
+    <p>{{ auteur.nom_complet }}</p>
+{% empty %}
+    <p>Aucun auteur trouvé</p>
+{% endfor %}
+
+{% endblock %}

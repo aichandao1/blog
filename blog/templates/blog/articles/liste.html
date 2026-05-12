@@ -78,17 +78,30 @@
                    class="badge badge-categorie me-1 mb-2 text-decoration-none"
                    style="background-color:{{ cat.couleur }}">
                     {{ cat.nom }} ({{ cat.nb_articles }})
+
+                    <a href="?tri=date">Par date</a>
+                     <a href="?tri=titre">Par titre</a>
+                     <a href="?tri=popularite">Popularité</a>
                 </a>
                 {% endfor %}
+
+           <form method="get" class="mb-3">
+            <select name="tri" class="form-select" onchange="this.form.submit()">
+                <option value="">Trier par</option>
+                <option value="date">Plus récent</option>
+                <option value="titre">Titre (A-Z)</option>
+                <option value="vues">Popularité</option>
+            </select>
+           </form>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-<a href="?tri=date">Par date</a>
-<a href="?tri=titre">Par titre</a>
-<a href="?tri=popularite">Popularité</a>
+
+
+
 
 
 

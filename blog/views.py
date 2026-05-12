@@ -1,19 +1,48 @@
+# blog/views.py
+
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
 from django.db.models import Q
-from django.utils import timezone
 from django.urls import reverse_lazy
-from django.views.generic import DeleteView
+from django.views.generic import (
+    ListView,
+    DetailView,
+    CreateView,
+    UpdateView,
+    DeleteView
+)
 
-from .models import Article, Categorie, Auteur, Commentaire
-from .forms import ArticleForm, CategorieForm, AuteurForm, CommentaireForm
+from rest_framework import generics
+
+from .models import (
+    Article,
+    Categorie,
+    Auteur,
+    Commentaire,
+    Like,
+    Tag
+)
+
+from .forms import (
+    ArticleForm,
+    CategorieForm,
+    AuteurForm,
+    CommentaireForm,
+    TagForm
+)
+
+from .serializers import (
+    ArticleSerializer,
+    CommentaireSerializer
+)
 
 
-# ── Accueil ───────────────────────────────────────────────────
+# =========================
+# ACCUEIL
+# =========================
+
 def accueil(request):
-    articles_recents = Article.objects.filter(statut='publie').select_related('auteur__user')[:6]
+    articles_recents = Article.objects.all()[:6]
     categories = Categorie.objects.all()[:8]
 
     return render(request, 'blog/accueil.html', {
@@ -22,220 +51,124 @@ def accueil(request):
     })
 
 
-# ── Liste des articles ────────────────────────────────────────
-def liste_articles(request):
-    articles = Article.objects.filter(statut='publie').select_related('auteur__user')
+# =========================
+# ARTICLES
+# =========================
 
-    q = request.GET.get('q', '')
-    if q:
-        articles = articles.filter(
-            Q(titre__icontains=q) |
-            Q(contenu__icontains=q) |
-            Q(auteur__user__username__icontains=q)
-        )
-
-    categorie_slug = request.GET.get('categorie', '')
-    if categorie_slug:
-        articles = articles.filter(categories__slug=categorie_slug)
-
-    paginator = Paginator(articles, 9)
-    page = request.GET.get('page', 1)
-    articles_page = paginator.get_page(page)
-
-    return render(request, 'blog/articles/liste.html', {
-        'articles': articles_page,
-        'categories': Categorie.objects.all(),
-        'q': q,
-        'cat_active': categorie_slug,
-    })
+class ArticleListView(ListView):
+    model = Article
+    template_name = 'blog/articles/liste.html'
+    context_object_name = 'articles'
 
 
-# ── Détail article ────────────────────────────────────────────
-def detail_article(request, slug):
-    article = get_object_or_404(Article, slug=slug, statut='publie')
-    article.incrementer_vues()
-
-    commentaires = article.commentaires.filter(approuve=True).select_related('auteur')
-    form_commentaire = CommentaireForm()
-
-    return render(request, 'blog/articles/detail.html', {
-        'article': article,
-        'commentaires': commentaires,
-        'form': form_commentaire,
-        'articles_lies': Article.objects.filter(
-            statut='publie',
-            categories__in=article.categories.all()
-        ).exclude(pk=article.pk).distinct()[:3],
-    })
+class ArticleDetailView(DetailView):
+    model = Article
+    template_name = 'blog/articles/detail.html'
+    context_object_name = 'article'
+    slug_field = 'slug'
+    slug_url_kwarg = 'slug'
 
 
-# ── Créer un article ──────────────────────────────────────────
-@login_required
-def creer_article(request):
-    try:
-        auteur = request.user.auteur
-    except Auteur.DoesNotExist:
-        messages.error(request, "Vous devez avoir un profil auteur.")
-        return redirect('blog:accueil')
-
-    if request.method == 'POST':
-        form = ArticleForm(request.POST, request.FILES)
-        if form.is_valid():
-            article = form.save(commit=False)
-            article.auteur = auteur
-
-            if article.statut == 'publie' and not article.date_publication:
-                article.date_publication = timezone.now()
-
-            article.save()
-            form.save_m2m()
-
-            messages.success(request, "Article créé avec succès !")
-            return redirect('blog:article_detail', slug=article.slug)
-    else:
-        form = ArticleForm()
-
-    return render(request, 'blog/articles/formulaire.html', {
-        'form': form,
-        'titre': 'Nouvel article',
-        'bouton': 'Publier',
-    })
+class ArticleCreateView(CreateView):
+    model = Article
+    form_class = ArticleForm
+    template_name = 'blog/articles/formulaire.html'
+    success_url = reverse_lazy('blog:article_liste')
 
 
-# ── Modifier un article ───────────────────────────────────────
-@login_required
-def modifier_article(request, slug):
-    article = get_object_or_404(Article, slug=slug)
-
-    if article.auteur.user != request.user and not request.user.is_staff:
-        messages.error(request, "Non autorisé.")
-        return redirect('blog:article_detail', slug=slug)
-
-    if request.method == 'POST':
-        form = ArticleForm(request.POST, request.FILES, instance=article)
-        if form.is_valid():
-            article = form.save()
-            messages.success(request, "Article modifié !")
-            return redirect('blog:article_detail', slug=article.slug)
-    else:
-        form = ArticleForm(instance=article)
-
-    return render(request, 'blog/articles/formulaire.html', {
-        'form': form,
-        'article': article,
-        'titre': f'Modifier : {article.titre}',
-        'bouton': 'Enregistrer',
-    })
+class ArticleUpdateView(UpdateView):
+    model = Article
+    form_class = ArticleForm
+    template_name = 'blog/articles/formulaire.html'
+    slug_field = 'slug'
+    slug_url_kwarg = 'slug'
 
 
-# ── Supprimer un article ──────────────────────────────────────
-@login_required
-def supprimer_article(request, slug):
-    article = get_object_or_404(Article, slug=slug)
-
-    if article.auteur.user != request.user and not request.user.is_staff:
-        messages.error(request, "Non autorisé.")
-        return redirect('blog:article_detail', slug=slug)
-
-    if request.method == 'POST':
-        article.delete()
-        messages.success(request, "Article supprimé.")
-        return redirect('blog:article_liste')
-
-    return render(request, 'blog/articles/confirmer_suppression.html', {'article': article})
+class ArticleDeleteView(DeleteView):
+    model = Article
+    template_name = 'blog/articles/confirmer_suppression.html'
+    success_url = reverse_lazy('blog:article_liste')
 
 
-# ── Catégories ────────────────────────────────────────────────
+# =========================
+# CATEGORIES
+# =========================
+
 def liste_categories(request):
     categories = Categorie.objects.all()
-    return render(request, 'blog/categories/liste.html', {'categories': categories})
+
+    return render(request, 'blog/categories/liste.html', {
+        'categories': categories
+    })
 
 
 def detail_categorie(request, slug):
     categorie = get_object_or_404(Categorie, slug=slug)
-    articles = categorie.articles.filter(statut='publie')
 
     return render(request, 'blog/categories/detail.html', {
-        'categorie': categorie,
-        'articles': articles,
+        'categorie': categorie
     })
 
 
-@login_required
-def creer_categorie(request):
-    if not request.user.is_staff:
-        return redirect('blog:categorie_liste')
+# =========================
+# AUTEURS
+# =========================
 
-    if request.method == 'POST':
-        form = CategorieForm(request.POST)
-        if form.is_valid():
-            cat = form.save()
-            return redirect('blog:categorie_detail', slug=cat.slug)
-    else:
-        form = CategorieForm()
-
-    return render(request, 'blog/categories/formulaire.html', {
-        'form': form,
-        'titre': 'Nouvelle catégorie',
-    })
-
-@login_required
-def modifier_categorie(request, slug):
-    categorie = get_object_or_404(Categorie, slug=slug)
-    if not request.user.is_staff:
-        return redirect('blog:categorie_liste')
-
-    if request.method == 'POST':
-        form = CategorieForm(request.POST, instance=categorie)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Categorie modifiee !')
-            return redirect('blog:categorie_detail', slug=categorie.slug)
-    else:
-        form = CategorieForm(instance=categorie)
-
-    return render(request, 'blog/categories/formulaire.html', {
-        'form': form, 'titre': f'Modifier : {categorie.nom}',
-    })
-
-# ── Auteurs ───────────────────────────────────────────────────
 def liste_auteurs(request):
-    auteurs = Auteur.objects.select_related('user').all()
-    return render(request, 'blog/auteurs/liste.html', {'auteurs': auteurs})
+    auteurs = Auteur.objects.all()
+
+    return render(request, 'blog/auteurs/liste.html', {
+        'auteurs': auteurs
+    })
 
 
 def detail_auteur(request, pk):
     auteur = get_object_or_404(Auteur, pk=pk)
-    articles = auteur.articles.filter(statut='publie')
 
     return render(request, 'blog/auteurs/detail.html', {
-        'auteur': auteur,
-        'articles': articles,
+        'auteur': auteur
     })
 
 
 @login_required
 def modifier_profil(request):
-    auteur, _ = Auteur.objects.get_or_create(user=request.user)
+
+    auteur, created = Auteur.objects.get_or_create(
+        user=request.user
+    )
 
     if request.method == 'POST':
-        form = AuteurForm(request.POST, request.FILES, instance=auteur)
+        form = AuteurForm(
+            request.POST,
+            request.FILES,
+            instance=auteur
+        )
+
         if form.is_valid():
             form.save()
             return redirect('blog:auteur_detail', pk=auteur.pk)
+
     else:
         form = AuteurForm(instance=auteur)
 
-    return render(request, 'blog/auteurs/formulaire.html', {'form': form})
+    return render(request, 'blog/auteurs/formulaire.html', {
+        'form': form
+    })
 
 
-# ── Commentaires ──────────────────────────────────────────────
+# =========================
+# COMMENTAIRES
+# =========================
+
 @login_required
 def ajouter_commentaire(request, slug):
-    article = get_object_or_404(Article, slug=slug, statut='publie')
+
+    article = get_object_or_404(Article, slug=slug)
 
     if request.method == 'POST':
+
         form = CommentaireForm(request.POST)
+
         if form.is_valid():
             commentaire = form.save(commit=False)
             commentaire.article = article
@@ -247,40 +180,200 @@ def ajouter_commentaire(request, slug):
 
 @login_required
 def supprimer_commentaire(request, pk):
+
     commentaire = get_object_or_404(Commentaire, pk=pk)
 
-    if request.user == commentaire.auteur or request.user.is_staff:
+    if request.user == commentaire.auteur:
+
         if request.method == 'POST':
             slug = commentaire.article.slug
             commentaire.delete()
-            return redirect('blog:article_detail', slug=slug)
+
+            return redirect(
+                'blog:article_detail',
+                slug=slug
+            )
 
     return redirect('blog:accueil')
 
-class ArticleDeleteView(DeleteView):
-    model = Article
-    template_name = 'blog/article_confirm_delete.html'
-    success_url = reverse_lazy('liste_articles')
+
+# =========================
+# LIKES
+# =========================
+
+@login_required
+def liker_article(request, slug):
+
+    article = get_object_or_404(Article, slug=slug)
+
+    like = Like.objects.filter(
+        article=article,
+        user=request.user
+    )
+
+    if like.exists():
+        like.delete()
+
+    else:
+        Like.objects.create(
+            article=article,
+            user=request.user
+        )
+
+    return redirect('blog:article_detail', slug=slug)
 
 
-    def liste_articles(request):
+# =========================
+# RECHERCHE
+# =========================
 
-        tri = request.GET.get('tri')
+def recherche_globale(request):
 
-        articles = Article.objects.all()
+    query = request.GET.get('q', '')
 
-        if tri == 'date':
-            articles = articles.order_by('-date_creation')
+    articles = Article.objects.filter(
+        Q(titre__icontains=query) |
+        Q(contenu__icontains=query)
+    )
 
-        elif tri == 'titre':
-            articles = articles.order_by('titre')
+    auteurs = Auteur.objects.filter(
+        Q(user__username__icontains=query)
+    )
 
-        elif tri == 'popularite':
-            articles = articles.order_by('-vues')
-
-        return render(request, 'blog/liste.html', {
-            'articles': articles
-        })
-
+    return render(request, 'blog/recherche.html', {
+        'query': query,
+        'articles': articles,
+        'auteurs': auteurs
+    })
 
 
+# =========================
+# TAGS
+# =========================
+
+def liste_tags(request):
+
+    tags = Tag.objects.all()
+
+    return render(request, 'blog/tags/liste.html', {
+        'tags': tags
+    })
+
+
+def detail_tag(request, slug):
+
+    tag = get_object_or_404(Tag, slug=slug)
+
+    return render(request, 'blog/tags/detail.html', {
+        'tag': tag
+    })
+
+
+# =========================
+# API ARTICLES
+# =========================
+
+class ArticleListCreateAPIView(
+    generics.ListCreateAPIView
+):
+
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+
+
+class ArticleDetailAPIView(
+    generics.RetrieveUpdateDestroyAPIView
+):
+
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+    lookup_field = 'slug'
+
+
+# =========================
+# API COMMENTAIRES
+# =========================
+
+class CommentaireListCreateAPIView(
+    generics.ListCreateAPIView
+):
+
+    queryset = Commentaire.objects.all()
+    serializer_class = CommentaireSerializer
+
+
+class CommentaireDetailAPIView(
+    generics.RetrieveUpdateDestroyAPIView
+):
+
+    queryset = Commentaire.objects.all()
+    serializer_class = CommentaireSerializer
+
+    
+    # =========================
+# CATEGORIES CRUD
+# =========================
+
+@login_required
+def creer_categorie(request):
+
+    if request.method == 'POST':
+
+        form = CategorieForm(request.POST)
+
+        if form.is_valid():
+            categorie = form.save()
+
+            return redirect(
+                'blog:categorie_detail',
+                slug=categorie.slug
+            )
+
+    else:
+        form = CategorieForm()
+
+    return render(
+        request,
+        'blog/categories/formulaire.html',
+        {
+            'form': form
+        }
+    )
+
+
+@login_required
+def modifier_categorie(request, slug):
+
+    categorie = get_object_or_404(
+        Categorie,
+        slug=slug
+    )
+
+    if request.method == 'POST':
+
+        form = CategorieForm(
+            request.POST,
+            instance=categorie
+        )
+
+        if form.is_valid():
+
+            form.save()
+
+            return redirect(
+                'blog:categorie_detail',
+                slug=categorie.slug
+            )
+
+    else:
+        form = CategorieForm(
+            instance=categorie
+        )
+
+    return render(
+        request,
+        'blog/categories/formulaire.html',
+        {
+            'form': form
+        }
+    )

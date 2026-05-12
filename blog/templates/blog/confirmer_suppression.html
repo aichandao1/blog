@@ -1,0 +1,46 @@
+{% extends 'blog/base.html' %}
+
+{% block titre %}Supprimer un article{% endblock %}
+
+{% block contenu %}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+
+        <div class="card shadow-sm border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4>Confirmation</h4>
+            </div>
+
+            <div class="card-body">
+                <p>
+                    Voulez-vous vraiment supprimer l’article :
+                </p>
+
+                <h5 class="text-danger">
+                    "{{ article.titre }}"
+                </h5>
+
+                <p class="text-muted">
+                    Cette action est irreversible.
+                </p>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <button type="submit" class="btn btn-danger">
+                        Oui, supprimer
+                    </button>
+
+                    <a href="{{ article.get_absolute_url }}"
+                       class="btn btn-secondary">
+                        Annuler
+                    </a>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

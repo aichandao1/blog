@@ -8,3 +8,5 @@
 </form>
 
 <a href="{% url 'liste_articles' %}">Annuler</a>
+
+tags = models.ManyToManyField(Tag, blank=True)

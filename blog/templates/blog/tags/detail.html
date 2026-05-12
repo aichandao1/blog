@@ -1,0 +1,47 @@
+{% extends 'blog/base.html' %}
+{% block titre %}Tag : #{{ tag.nom }}{% endblock %}
+{% block contenu %}
+
+<h1 class="mb-4">Tous les tags</h1>
+
+<div class="d-flex flex-wrap gap-2">
+    {% for tag in tags %}
+    <a href="{{ tag.get_absolute_url }}"
+       class="badge text-decoration-none fs-6 bg-secondary">
+        #{{ tag.nom }}
+    </a>
+    {% empty %}
+    <p class="text-muted">Aucun tag pour l'instant.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+<div class="d-flex align-items-center gap-3 mb-4">
+    <h1 class="mb-0">#{{ tag.nom }}</h1>
+    <span class="badge bg-secondary">{{ articles.count }} article{{ articles.count|pluralize }}</span>
+</div>
+
+<div class="row g-4">
+    {% for article in articles %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card card-article h-100">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <a href="{{ article.get_absolute_url }}" class="text-decoration-none text-dark">
+                        {{ article.titre }}
+                    </a>
+                </h5>
+                <p class="card-text text-muted small">{{ article.extrait }}</p>
+            </div>
+            <div class="card-footer text-muted small">
+                {{ article.auteur.nom_complet }}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <p class="col text-muted">Aucun article avec ce tag.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}

@@ -1,6 +1,3 @@
-
-# blog/models.py
-
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -8,31 +5,15 @@ import math
 
 
 class Auteur(models.Model):
-    """
-    Profil etendu d'un utilisateur Django.
-    OneToOneField : 1 User = 1 Auteur (jamais plus).
-    """
     user = models.OneToOneField(
         User,
-        on_delete=models.CASCADE,     # Si le User est supprime, l'Auteur aussi
-        related_name='auteur',        # user.auteur pour acceder au profil
+        on_delete=models.CASCADE,
+        related_name='auteur',
         verbose_name='Utilisateur',
     )
-    bio = models.TextField(
-        blank=True,
-        verbose_name='Biographie',
-        help_text='Presentation de l auteur',
-    )
-    photo = models.ImageField(
-        upload_to='auteurs/',         
-        blank=True,
-        null=True,
-        verbose_name='Photo de profil',
-    )
-    site_web = models.URLField(
-        blank=True,
-        verbose_name='Site web',
-    )
+    bio = models.TextField(blank=True, verbose_name='Biographie')
+    photo = models.ImageField(upload_to='auteurs/', blank=True, null=True, verbose_name='Photo de profil')
+    site_web = models.URLField(blank=True, verbose_name='Site web')
     date_inscription = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -53,27 +34,13 @@ class Auteur(models.Model):
     @property
     def nb_articles(self):
         return self.articles.filter(statut='publie').count()
-    
+
+
 class Categorie(models.Model):
-    """
-    Categorie d'articles. Un article peut appartenir a plusieurs categories.
-    """
-    nom = models.CharField(
-        max_length=100,
-        unique=True,           # Pas de doublons de nom
-        verbose_name='Nom',
-    )
-    slug = models.SlugField(
-        max_length=100,
-        unique=True,
-        help_text='Identifiant URL (genere automatiquement)',
-    )
+    nom = models.CharField(max_length=100, unique=True, verbose_name='Nom')
+    slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True, verbose_name='Description')
-    couleur = models.CharField(
-        max_length=7,
-        default='#3B82F6',    # Couleur hexadecimale pour le badge
-        verbose_name='Couleur (hex)',
-    )
+    couleur = models.CharField(max_length=7, default='#3B82F6', verbose_name='Couleur (hex)')
     date_creation = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -90,71 +57,61 @@ class Categorie(models.Model):
     @property
     def nb_articles(self):
         return self.articles.filter(statut='publie').count()
-    
+
+
+class Tag(models.Model):
+    nom = models.CharField(max_length=50, unique=True, verbose_name='Tag')
+    slug = models.SlugField(max_length=50, unique=True)
+
+    class Meta:
+        verbose_name = 'Tag'
+        verbose_name_plural = 'Tags'
+        ordering = ['nom']
+
+    def __str__(self):
+        return f'#{self.nom}'
+
+    def get_absolute_url(self):
+        return reverse('blog:tag_detail', kwargs={'slug': self.slug})
+
+
 class Article(models.Model):
-    """
-    Article de blog. Coeur de l'application.
-    """
     STATUT_CHOICES = [
         ('brouillon', 'Brouillon'),
         ('publie',    'Publie'),
-        ('archive',  'Archive'),
+        ('archive',   'Archive'),
     ]
 
     titre = models.CharField(max_length=200, verbose_name='Titre')
-    slug = models.SlugField(
-        max_length=200,
-        unique=True,
-        help_text='Identifiant URL unique',
-    )
+    slug = models.SlugField(max_length=200, unique=True)
     auteur = models.ForeignKey(
         Auteur,
-        on_delete=models.SET_NULL,    # Si l'auteur est supprime, article conserve (auteur=NULL)
+        on_delete=models.SET_NULL,
         null=True,
-        related_name='articles',      # auteur.articles.all() pour obtenir ses articles
+        related_name='articles',
         verbose_name='Auteur',
     )
     categories = models.ManyToManyField(
         Categorie,
         blank=True,
-        related_name='articles',      # categorie.articles.all()
+        related_name='articles',
         verbose_name='Categories',
     )
+    tags = models.ManyToManyField(
+        Tag,
+        blank=True,
+        related_name='articles',
+        verbose_name='Tags',
+    )
     contenu = models.TextField(verbose_name='Contenu')
-    extrait = models.TextField(
-        blank=True,
-        max_length=500,
-        verbose_name='Extrait',
-        help_text='Courte description pour la liste',
-    )
-    image_couverture = models.ImageField(
-        upload_to='articles/',
-        blank=True,
-        null=True,
-        verbose_name='Image de couverture',
-    )
-    statut = models.CharField(
-        max_length=20,
-        choices=STATUT_CHOICES,
-        default='brouillon',
-        verbose_name='Statut',
-    )
-    date_creation  = models.DateTimeField(auto_now_add=True)
+    extrait = models.TextField(blank=True, max_length=500, verbose_name='Extrait')
+    image_couverture = models.ImageField(upload_to='articles/', blank=True, null=True, verbose_name='Image de couverture')
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='brouillon', verbose_name='Statut')
+    date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
     date_publication = models.DateTimeField(null=True, blank=True)
     nb_vues = models.PositiveIntegerField(default=0, verbose_name='Nombre de vues')
-    temps_lecture = models.PositiveIntegerField(
-        default=0,
-        editable=False
-    )
-    def save(self, *args, **kwargs):
-        mots = self.contenu.split()
-        nb_mots = len(mots)
-        self.temps_lecture = math.ceil(nb_mots / 200)
-        
-        super().save(*args,**kwargs)
-
-
+    temps_lecture = models.PositiveIntegerField(default=0, editable=False)
 
     class Meta:
         verbose_name = 'Article'
@@ -167,22 +124,23 @@ class Article(models.Model):
     def get_absolute_url(self):
         return reverse('blog:article_detail', kwargs={'slug': self.slug})
 
+    def save(self, *args, **kwargs):
+        self.temps_lecture = math.ceil(len(self.contenu.split()) / 200)
+        super().save(*args, **kwargs)
+
     @property
     def nb_commentaires(self):
         return self.commentaires.filter(approuve=True).count()
 
     def incrementer_vues(self):
         self.nb_vues += 1
-        self.save(update_fields=['nb_vues'])  # Update partiel : plus efficace
-        
+        self.save(update_fields=['nb_vues'])
+
+
 class Commentaire(models.Model):
-    """
-    Commentaire laisse sur un article.
-    Lie a un Article (ForeignKey) et a un User Django (ForeignKey).
-    """
     article = models.ForeignKey(
         Article,
-        on_delete=models.CASCADE,     # Si l'article est supprime, commentaires aussi
+        on_delete=models.CASCADE,
         related_name='commentaires',
         verbose_name='Article',
     )
@@ -193,15 +151,8 @@ class Commentaire(models.Model):
         related_name='commentaires',
         verbose_name='Auteur',
     )
-    contenu = models.TextField(
-        verbose_name='Commentaire',
-        max_length=2000,
-    )
-    approuve = models.BooleanField(
-        default=False,
-        verbose_name='Approuve',
-        help_text='Seuls les commentaires approuves sont visibles',
-    )
+    contenu = models.TextField(verbose_name='Commentaire', max_length=2000)
+    approuve = models.BooleanField(default=False, verbose_name='Approuve')
     date_creation = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -214,21 +165,10 @@ class Commentaire(models.Model):
         return f'Commentaire de {auteur_nom} sur "{self.article.titre[:40]}"'
 
 
-        class Article(models.Model):
-            titre = models.CharField(max_length=200)
-            contenue = models.TextField()
+class Like(models.Model):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='likes')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    date = models.DateTimeField(auto_now_add=True)
 
-            def temps_lecture(self):
-                nb_mots = len(self.contenue.split())
-                return max(1, nb_mots // 200)
-                nombre_mots = len(mots)
-                
-
-        
-
-
-
-    
-
-
-# Create your models here.
+    class Meta:
+        unique_together = ('article', 'user')
